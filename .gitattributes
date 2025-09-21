@@ -1,2 +1,87 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Mini Projeto Selenium - Pesquisa Jurídica
+
+## - Projeto de entrar num site
+## - Preencher informações de acordo com uma Base de Dados
+## - Pesquisar se um Processo Jurídico existe
+## - Colocar o resultado da Pesquisa na Base de Dados
+
+# criar o navegador
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver import ActionChains as AC
+import time
+
+servico = Service(ChromeDriverManager().install())
+navegador = webdriver.Chrome(service=servico)
+
+# Achando o caminho do arquivo
+import os
+caminho = os.getcwd()
+arquivo = caminho + r"\index.html"
+
+# Iniciando a Página
+navegador.get(arquivo)
+
+# Importando a Base de Dados
+import pandas as pd
+arquivo_df = caminho + r"\Processos.xlsx"
+tabela = pd.read_excel(arquivo_df)
+display(tabela)
+
+def pesquisa_juridica(cidade, nome, advogado, processo):
+    # Passando o Mouse por cima da Lista
+    elemento = navegador.find_element(By.XPATH, '/html/body/div/div/button')
+    AC(navegador).move_to_element(elemento).perform()
+    time.sleep(1)
+
+    # Verificando a Cidade
+    navegador.find_element(By.PARTIAL_LINK_TEXT, cidade).click()
+
+    # Mudar de Página
+    aba_original = navegador.window_handles[0]
+    aba_nova = navegador.window_handles[1]
+    navegador.switch_to.window(aba_nova)
+
+    # Preenchendo os Inputs
+    navegador.find_element(By.ID, 'nome').send_keys(nome)
+    navegador.find_element(By.ID, 'advogado').send_keys(advogado)
+    navegador.find_element(By.ID, 'numero').send_keys(processo)
+
+    # Clicando em Prosseguir
+    navegador.find_element(By.XPATH, '//*[@id="formulario"]/div/button').click()
+
+    # Cuidando dos Alertas
+    from selenium.webdriver.common.alert import Alert
+    alerta = Alert(navegador)
+    alerta.accept()
+    time.sleep(4)
+
+    alerta = navegador.switch_to.alert
+    texto_alerta = alerta.text
+    alerta.accept()
+
+    # Deletando a Aba e reiniciando a aba original
+    navegador.close()
+    navegador.switch_to.window(aba_original)
+    navegador.refresh()
+    return texto_alerta
+
+# Colocando a Função em ação
+for i in tabela.index:
+    # Unpachin da Tabela
+    cidade = tabela.loc[i, "Cidade"]
+    nome = tabela.loc[i, "Nome"]
+    advogado = tabela.loc[i, "Advogado"]
+    processo = tabela.loc[i, "Processo"]
+    resultado = pesquisa_juridica(cidade, nome, advogado, processo)
+    # Fazendo umas Alterações no resultado da Pesquisa
+    if " Deseja acessar?" in resultado:
+        resultado = resultado.replace(" Deseja acessar?", "")
+    resultado = resultado.replace("!", "")
+    tabela["Status"][i] = resultado
+
+# Resultado Final
+display(tabela)
+print("----------------------------------------------------------------\nFim do Programa.")
